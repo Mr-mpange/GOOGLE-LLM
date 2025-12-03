@@ -1,0 +1,178 @@
+{
+  "title": "LLM Guardian - Telemetry Dashboard",
+  "description": "Comprehensive LLM telemetry monitoring including prompts, tokens, costs, and safety metrics",
+  "widgets": [
+    {
+      "id": 1,
+      "definition": {
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "sum:llm.request.count{*}.as_count()",
+            "display_type": "bars",
+            "style": {
+              "palette": "dog_classic",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "title": "Prompts Per Minute",
+        "show_legend": true
+      }
+    },
+    {
+      "id": 2,
+      "definition": {
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "avg:llm.tokens.input{*}",
+            "display_type": "line",
+            "style": {
+              "palette": "blue"
+            }
+          },
+          {
+            "q": "avg:llm.tokens.output{*}",
+            "display_type": "line",
+            "style": {
+              "palette": "green"
+            }
+          }
+        ],
+        "title": "Token Usage Trends",
+        "show_legend": true
+      }
+    },
+    {
+      "id": 3,
+      "definition": {
+        "type": "query_value",
+        "requests": [
+          {
+            "q": "sum:llm.tokens.total{*}",
+            "aggregator": "sum"
+          }
+        ],
+        "title": "Total Tokens Consumed",
+        "precision": 0
+      }
+    },
+    {
+      "id": 4,
+      "definition": {
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "avg:llm.safety.score{*}",
+            "display_type": "line",
+            "style": {
+              "palette": "purple"
+            }
+          }
+        ],
+        "title": "Safety Score Distribution",
+        "show_legend": false,
+        "yaxis": {
+          "min": "0",
+          "max": "1"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "definition": {
+        "type": "query_value",
+        "requests": [
+          {
+            "q": "sum:llm.security.injection_blocked{*}.as_count()",
+            "aggregator": "sum"
+          }
+        ],
+        "title": "Injection Attempts Blocked",
+        "precision": 0,
+        "custom_unit": "attempts"
+      }
+    },
+    {
+      "id": 6,
+      "definition": {
+        "type": "toplist",
+        "requests": [
+          {
+            "q": "top(sum:llm.cost{*} by {user}, 10, 'sum', 'desc')"
+          }
+        ],
+        "title": "Most Expensive Users"
+      }
+    },
+    {
+      "id": 7,
+      "definition": {
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "sum:llm.cost{*}",
+            "display_type": "area",
+            "style": {
+              "palette": "green"
+            }
+          }
+        ],
+        "title": "Cumulative Cost",
+        "show_legend": false
+      }
+    },
+    {
+      "id": 8,
+      "definition": {
+        "type": "heatmap",
+        "requests": [
+          {
+            "q": "avg:llm.request.latency{*} by {model}"
+          }
+        ],
+        "title": "Latency Heatmap by Model"
+      }
+    },
+    {
+      "id": 9,
+      "definition": {
+        "type": "event_timeline",
+        "query": "tags:security:prompt-injection OR tags:security:unsafe-content",
+        "title": "Security Events Timeline"
+      }
+    },
+    {
+      "id": 10,
+      "definition": {
+        "type": "query_value",
+        "requests": [
+          {
+            "q": "avg:llm.safety.score{*}",
+            "aggregator": "avg"
+          }
+        ],
+        "title": "Average Safety Score",
+        "precision": 2,
+        "custom_unit": "/1.0"
+      }
+    }
+  ],
+  "layout_type": "ordered",
+  "is_read_only": false,
+  "notify_list": [],
+  "template_variables": [
+    {
+      "name": "env",
+      "default": "production",
+      "prefix": "env"
+    },
+    {
+      "name": "model",
+      "default": "*",
+      "prefix": "model"
+    }
+  ]
+}

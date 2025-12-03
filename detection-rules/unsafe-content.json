@@ -1,0 +1,46 @@
+{
+  "name": "Unsafe Content Detection",
+  "type": "log_detection",
+  "isEnabled": true,
+  "queries": [
+    {
+      "query": "source:llm-guardian tags:security:unsafe-content @safety_score:<0.5",
+      "aggregation": "count",
+      "groupByFields": ["user", "model"],
+      "distinctFields": [],
+      "metric": "llm.security.unsafe_content"
+    }
+  ],
+  "cases": [
+    {
+      "status": "high",
+      "condition": "a > 3",
+      "name": "Multiple unsafe content generations",
+      "notifications": [
+        "@slack-security-alerts",
+        "@email-compliance-team"
+      ]
+    },
+    {
+      "status": "medium",
+      "condition": "a > 0",
+      "name": "Unsafe content generated",
+      "notifications": [
+        "@slack-security-alerts"
+      ]
+    }
+  ],
+  "options": {
+    "evaluationWindow": 300,
+    "keepAlive": 3600,
+    "maxSignalDuration": 86400,
+    "detectionMethod": "threshold"
+  },
+  "message": "## Unsafe Content Generated\n\n**Severity:** {{#is_alert}}High{{/is_alert}}{{#is_warning}}Medium{{/is_warning}}\n\n**Safety Score:** {{safety_score}}\n**Threshold:** 0.5\n\n**User:** {{user}}\n**Model:** {{model}}\n**Request ID:** {{request_id}}\n\n**Safety Ratings:**\n- Hate Speech: {{hate_speech_rating}}\n- Dangerous Content: {{dangerous_content_rating}}\n- Sexually Explicit: {{sexually_explicit_rating}}\n- Harassment: {{harassment_rating}}\n\n**Action Required:**\n1. Review the generated content\n2. Investigate the prompt that triggered it\n3. Consider adjusting safety filters\n4. Review user history for patterns\n5. Update content policy if needed\n\n**Logs:** [View in Datadog](https://app.datadoghq.com/logs?query=request_id:{{request_id}})\n\n**Runbook:** https://docs.company.com/security/unsafe-content-response",
+  "tags": [
+    "security:unsafe-content",
+    "service:llm-guardian",
+    "team:security",
+    "compliance:required"
+  ]
+}

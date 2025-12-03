@@ -1,0 +1,50 @@
+{
+  "name": "High Latency Alert",
+  "type": "metric alert",
+  "isEnabled": true,
+  "queries": [
+    {
+      "query": "avg(last_5m):avg:llm.request.latency{*}",
+      "aggregation": "avg",
+      "groupByFields": ["model", "endpoint"],
+      "metric": "llm.request.latency"
+    }
+  ],
+  "cases": [
+    {
+      "status": "critical",
+      "condition": "a > 5000",
+      "name": "Critical latency threshold exceeded",
+      "notifications": [
+        "@slack-alerts",
+        "@pagerduty"
+      ]
+    },
+    {
+      "status": "warning",
+      "condition": "a > 3000",
+      "name": "Warning latency threshold exceeded",
+      "notifications": [
+        "@slack-alerts"
+      ]
+    }
+  ],
+  "options": {
+    "evaluationWindow": 300,
+    "thresholds": {
+      "critical": 5000,
+      "warning": 3000
+    },
+    "notifyNoData": true,
+    "noDataTimeframe": 10,
+    "requireFullWindow": false,
+    "notifyAudit": false,
+    "includeTags": true
+  },
+  "message": "## High Latency Detected\n\n**Severity:** {{#is_alert}}Critical{{/is_alert}}{{#is_warning}}Warning{{/is_warning}}\n\n**Current Latency:** {{value}}ms\n**Threshold:** {{threshold}}ms\n\n**Model:** {{model}}\n**Endpoint:** {{endpoint}}\n\n**Possible Causes:**\n- Vertex AI API slowdown\n- Network issues\n- Large prompt/response size\n- Model overload\n\n**Action Required:**\n1. Check Vertex AI status page\n2. Review recent prompts for complexity\n3. Monitor token usage\n4. Consider scaling resources\n\n**Dashboard:** [View Performance Dashboard](https://app.datadoghq.com/dashboard/llm-performance)\n\n**Runbook:** https://docs.company.com/runbooks/high-latency",
+  "tags": [
+    "alert:latency",
+    "service:llm-guardian",
+    "team:platform"
+  ]
+}

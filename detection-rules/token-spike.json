@@ -1,0 +1,46 @@
+{
+  "name": "Token Usage Spike Detection",
+  "type": "metric alert",
+  "isEnabled": true,
+  "queries": [
+    {
+      "query": "avg(last_15m):sum:llm.tokens.total{*}.as_rate()",
+      "aggregation": "sum",
+      "groupByFields": ["user", "model"],
+      "metric": "llm.tokens.total"
+    }
+  ],
+  "cases": [
+    {
+      "status": "high",
+      "condition": "change(a, 15m) > 50",
+      "name": "Token usage increased by more than 50%",
+      "notifications": [
+        "@slack-cost-alerts",
+        "@email-finance-team"
+      ]
+    },
+    {
+      "status": "medium",
+      "condition": "change(a, 15m) > 30",
+      "name": "Token usage increased by more than 30%",
+      "notifications": [
+        "@slack-cost-alerts"
+      ]
+    }
+  ],
+  "options": {
+    "evaluationWindow": 900,
+    "detectionMethod": "change",
+    "changeType": "percentage",
+    "keepAlive": 1800,
+    "maxSignalDuration": 86400
+  },
+  "message": "## Token Usage Spike Detected\n\n**Severity:** {{#is_alert}}High{{/is_alert}}{{#is_warning}}Medium{{/is_warning}}\n\n**Change:** +{{change}}% in the last 15 minutes\n**Current Rate:** {{value}} tokens/sec\n\n**User:** {{user}}\n**Model:** {{model}}\n\n**Cost Impact:**\n- Estimated additional cost: ${{estimated_cost}}\n- Daily projection: ${{daily_projection}}\n\n**Possible Causes:**\n- Increased user activity\n- Longer prompts/responses\n- Automated/bot activity\n- Application bug causing loops\n\n**Action Required:**\n1. Review recent user activity\n2. Check for automated requests\n3. Verify application behavior\n4. Consider rate limiting if abuse detected\n\n**Dashboard:** [View Telemetry Dashboard](https://app.datadoghq.com/dashboard/llm-telemetry)\n\n**Runbook:** https://docs.company.com/runbooks/token-spike",
+  "tags": [
+    "alert:token-usage",
+    "service:llm-guardian",
+    "team:platform",
+    "cost:monitoring"
+  ]
+}
