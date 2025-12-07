@@ -4,6 +4,9 @@ import PromptTester from './components/PromptTester';
 import MetricsPanel from './components/MetricsPanel';
 import AlertsPanel from './components/AlertsPanel';
 import ChartsPanel from './components/ChartsPanel';
+import SelfHealingPanel from './components/SelfHealingPanel';
+import CostOptimizationPanel from './components/CostOptimizationPanel';
+import UserRiskPanel from './components/UserRiskPanel';
 
 function App() {
   const [darkMode, setDarkMode] = useState(true);
@@ -103,6 +106,9 @@ function App() {
 
           {/* Right Column - Metrics & Alerts */}
           <div className="space-y-8">
+            <SelfHealingPanel />
+            <CostOptimizationPanel />
+            <UserRiskPanel />
             <MetricsPanel metrics={metrics} />
             <AlertsPanel />
           </div>

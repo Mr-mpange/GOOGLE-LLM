@@ -8,15 +8,34 @@ console.log(`✓ Initializing Vertex AI with project: ${projectId}, location: ${
 
 // Initialize Vertex AI
 const vertexAI = new VertexAI({ project: projectId, location: location });
-const model = 'gemini-2.0-flash-exp';
+
+// Current model (can be changed dynamically)
+let currentModel = 'gemini-2.0-flash-exp';
+
+/**
+ * Set the current model
+ */
+export function setModel(modelName) {
+  currentModel = modelName;
+  console.log(`✓ Model switched to: ${modelName}`);
+}
+
+/**
+ * Get the current model
+ */
+export function getCurrentModel() {
+  return currentModel;
+}
 
 /**
  * Generate content using Vertex AI Gemini
  */
-export async function generateContent(prompt) {
+export async function generateContent(prompt, customModel = null) {
   try {
+    const modelToUse = customModel || currentModel;
+    
     const generativeModel = vertexAI.getGenerativeModel({
-      model: model,
+      model: modelToUse,
       generation_config: {
         max_output_tokens: 2048,
         temperature: 0.7,
@@ -73,4 +92,4 @@ export function calculateCost(tokensIn, tokensOut) {
   return parseFloat((inputCost + outputCost).toFixed(6));
 }
 
-export default { generateContent, calculateCost };
+export default { generateContent, calculateCost, setModel, getCurrentModel };

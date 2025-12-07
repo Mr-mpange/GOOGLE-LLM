@@ -4,12 +4,14 @@ import { config } from './config.js';
 import express from 'express';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
-import { generateContent, calculateCost } from './vertexai.js';
+import { generateContent, calculateCost, setModel, getCurrentModel } from './vertexai.js';
 import { sendLog, sendMetric, sendSecuritySignal } from './datadog.js';
 import { detectPromptInjection, calculateSafetyScore } from './security.js';
 import { formatResponse, toHTML, toMarkdown } from './responseFormatter.js';
 import metricsStore from './metricsStore.js';
 import alertsStore, { getTimeAgo } from './alertsStore.js';
+import selfHealingSystem from './selfHealing.js';
+import userRiskScoring from './userRiskScoring.js';
 
 const app = express();
 const PORT = config.port;
@@ -47,15 +49,22 @@ app.post('/api/prompt', async (req, res) => {
     if (injectionDetected.isInjection) {
       const latency = Date.now() - startTime;
       
+      // Record user risk
+      userRiskScoring.recordActivity(userId, {
+        type: 'injection_attempt',
+        details: { patterns: injectionDetected.patterns }
+      });
+      
       // Add security alert
       alertsStore.addAlert({
         severity: 'high',
         title: 'Prompt Injection Blocked',
-        message: 'Suspicious prompt pattern detected and blocked',
+        message: `User ${userId} attempted prompt injection`,
         metadata: {
           patterns: injectionDetected.patterns,
           userId,
-          requestId
+          requestId,
+          riskScore: userRiskScoring.getUserRisk(userId)?.riskScore
         }
       });
       
@@ -79,6 +88,15 @@ app.post('/api/prompt', async (req, res) => {
       return res.status(403).json({
         error: 'Prompt rejected due to security policy',
         reason: 'potential_injection',
+        requestId
+      });
+    }
+
+    // Check if user is blocked
+    if (userRiskScoring.isUserBlocked(userId)) {
+      return res.status(403).json({
+        error: 'User blocked due to high risk score',
+        reason: 'user_blocked',
         requestId
       });
     }
@@ -123,7 +141,7 @@ app.post('/api/prompt', async (req, res) => {
       latency,
       cost,
       safetyScore,
-      model: 'gemini-pro',
+      model: getCurrentModel(),
       timestamp: new Date().toISOString(),
       status: 'success'
     };
@@ -158,11 +176,31 @@ app.post('/api/prompt', async (req, res) => {
 
     // Check for low safety score
     if (safetyScore < 0.7) {
+      userRiskScoring.recordActivity(userId, {
+        type: 'unsafe_prompt',
+        details: { safetyScore }
+      });
+      
       alertsStore.addAlert({
         severity: 'medium',
         title: 'Low Safety Score',
-        message: `Response safety score below threshold (${(safetyScore * 100).toFixed(0)}%)`,
-        metadata: { safetyScore, requestId }
+        message: `User ${userId} generated unsafe content (${(safetyScore * 100).toFixed(0)}%)`,
+        metadata: { safetyScore, requestId, userId }
+      });
+    } else {
+      // Record normal activity (reduces risk score)
+      userRiskScoring.recordActivity(userId, {
+        type: 'normal',
+        details: { safetyScore, cost }
+      });
+    }
+
+    // Check for high cost
+    if (cost > 0.01) {
+      userRiskScoring.recordActivity(userId, {
+        type: 'high_cost',
+        cost,
+        details: { tokensOut }
       });
     }
 
@@ -175,6 +213,24 @@ app.post('/api/prompt', async (req, res) => {
       cost,
       safetyScore
     });
+
+    // Self-healing analysis
+    const healingResult = await selfHealingSystem.analyzeAndHeal({
+      latency,
+      tokensIn,
+      tokensOut,
+      cost,
+      safetyScore
+    });
+
+    // Apply model switch if healing triggered it
+    if (healingResult.actions && healingResult.actions.length > 0) {
+      for (const action of healingResult.actions) {
+        if (action.action === 'switch_model' && action.to) {
+          setModel(action.to);
+        }
+      }
+    }
 
     // Format response with structure
     const structuredResponse = formatResponse(aiResponse.text);
@@ -197,7 +253,7 @@ app.post('/api/prompt', async (req, res) => {
         latency,
         cost,
         safetyScore,
-        model: 'gemini-2.0-flash-exp'
+        model: getCurrentModel()
       }
     });
 
@@ -292,6 +348,94 @@ app.patch('/api/alerts/:id', async (req, res) => {
     res.json(alert);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update alert' });
+  }
+});
+
+// Get self-healing status
+app.get('/api/self-healing', async (req, res) => {
+  try {
+    const history = selfHealingSystem.getHealingHistory(20);
+    const currentModel = getCurrentModel(); // Get from vertexai.js
+    
+    res.json({
+      currentModel,
+      history,
+      enabled: true
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch self-healing status' });
+  }
+});
+
+// Get user risk scores
+app.get('/api/users/risk', async (req, res) => {
+  try {
+    const highRiskUsers = userRiskScoring.getHighRiskUsers(20);
+    const stats = userRiskScoring.getStats();
+    
+    res.json({
+      users: highRiskUsers.map(user => ({
+        ...user,
+        riskLevel: userRiskScoring.getRiskLevel(user.riskScore)
+      })),
+      stats
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch user risk data' });
+  }
+});
+
+// Get specific user risk
+app.get('/api/users/:userId/risk', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const userRisk = userRiskScoring.getUserRisk(userId);
+    
+    if (!userRisk) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({
+      ...userRisk,
+      riskLevel: userRiskScoring.getRiskLevel(userRisk.riskScore)
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch user risk' });
+  }
+});
+
+// Manual model switch
+app.post('/api/model/switch', async (req, res) => {
+  try {
+    const { model } = req.body;
+    
+    const validModels = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    if (!validModels.includes(model)) {
+      return res.status(400).json({ error: 'Invalid model' });
+    }
+    
+    const previousModel = getCurrentModel();
+    
+    // Actually switch the model
+    setModel(model);
+    
+    // Update self-healing system
+    const modelConfig = selfHealingSystem.models.find(m => m.name === model);
+    if (modelConfig) {
+      selfHealingSystem.currentModel = modelConfig;
+    }
+    
+    // Create alert
+    alertsStore.addAlert({
+      severity: 'low',
+      title: 'Model Switched Manually',
+      message: `Switched from ${previousModel} to ${model}`,
+      metadata: { from: previousModel, to: model, action: 'manual_switch' }
+    });
+    
+    res.json({ success: true, model, previousModel });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to switch model' });
   }
 });
 
