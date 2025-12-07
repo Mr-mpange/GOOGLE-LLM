@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Moon, Sun, Shield, Activity, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Moon, Sun, Shield, Activity, AlertTriangle, TrendingUp, Key, Users } from 'lucide-react';
 import PromptTester from './components/PromptTester';
 import MetricsPanel from './components/MetricsPanel';
 import AlertsPanel from './components/AlertsPanel';
 import ChartsPanel from './components/ChartsPanel';
 import SelfHealingPanel from './components/SelfHealingPanel';
 import CostOptimizationPanel from './components/CostOptimizationPanel';
+import APIKeyManagement from './components/APIKeyManagement';
+import UserManagement from './components/UserManagement';
 import UserRiskPanel from './components/UserRiskPanel';
 
 function App() {
   const [darkMode, setDarkMode] = useState(true);
   const [metrics, setMetrics] = useState(null);
+  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'api-keys', or 'users'
 
   useEffect(() => {
     if (darkMode) {
@@ -43,6 +46,42 @@ function App() {
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Navigation Tabs */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setCurrentView('dashboard')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    currentView === 'dashboard'
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => setCurrentView('users')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1 ${
+                    currentView === 'users'
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Users</span>
+                </button>
+                <button
+                  onClick={() => setCurrentView('api-keys')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1 ${
+                    currentView === 'api-keys'
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Key className="w-4 h-4" />
+                  <span>API Keys</span>
+                </button>
+              </div>
+
               <div className="flex items-center space-x-2 text-sm">
                 <Activity className="w-4 h-4 text-green-500" />
                 <span className="text-gray-600 dark:text-gray-300">
@@ -68,8 +107,14 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        {currentView === 'users' ? (
+          <UserManagement />
+        ) : currentView === 'api-keys' ? (
+          <APIKeyManagement />
+        ) : (
+          <>
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <StatCard
             icon={<Activity className="w-6 h-6" />}
             label="Total Requests"
@@ -113,6 +158,8 @@ function App() {
             <AlertsPanel />
           </div>
         </div>
+          </>
+        )}
       </main>
 
       {/* Footer */}

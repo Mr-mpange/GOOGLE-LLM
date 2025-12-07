@@ -11,6 +11,8 @@ import { formatResponse, toHTML, toMarkdown } from './responseFormatter.js';
 import metricsStore from './metricsStore.js';
 import alertsStore, { getTimeAgo } from './alertsStore.js';
 import selfHealingSystem from './selfHealing.js';
+import apiKeyManager from './apiKeyManager.js';
+import userManager from './userManager.js';
 import userRiskScoring from './userRiskScoring.js';
 
 const app = express();
@@ -26,6 +28,35 @@ app.use((req, res, next) => {
   req.startTime = Date.now();
   next();
 });
+
+// API Key validation middleware
+const validateApiKey = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  
+  // Skip validation for health check and public endpoints
+  if (req.path === '/health' || req.path.startsWith('/api/keys')) {
+    return next();
+  }
+  
+  if (!apiKey) {
+    return res.status(401).json({ error: 'API key required' });
+  }
+
+  const validation = apiKeyManager.validateKey(apiKey);
+  
+  if (!validation.valid) {
+    return res.status(403).json({ error: validation.error });
+  }
+
+  req.apiKey = apiKey;
+  req.keyData = validation.keyData;
+  req.keyUsage = validation.usage;
+  
+  next();
+};
+
+// Apply API key validation to protected routes
+app.use('/api/prompt', validateApiKey);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -202,6 +233,11 @@ app.post('/api/prompt', async (req, res) => {
         cost,
         details: { tokensOut }
       });
+    }
+
+    // Record API key usage
+    if (req.apiKey) {
+      apiKeyManager.recordUsage(req.apiKey, totalTokens, cost);
     }
 
     // Record metrics
@@ -401,6 +437,336 @@ app.get('/api/users/:userId/risk', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch user risk' });
+  }
+});
+
+// API Key Management Endpoints
+
+// Create new API key
+app.post('/api/keys/create', async (req, res) => {
+  try {
+    const { userId, name, permissions, limits } = req.body;
+    
+    if (!userId || !name) {
+      return res.status(400).json({ error: 'userId and name are required' });
+    }
+
+    const keyData = apiKeyManager.createKey(userId, name, {
+      ...permissions,
+      ...limits
+    });
+
+    res.json({
+      success: true,
+      key: keyData.key,
+      maskedKey: apiKeyManager.maskKey(keyData.key),
+      keyData: {
+        ...keyData,
+        key: undefined // Don't send full key in response after creation
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create API key' });
+  }
+});
+
+// List all API keys
+app.get('/api/keys', async (req, res) => {
+  try {
+    const keys = apiKeyManager.getAllKeys();
+    res.json({ keys });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch API keys' });
+  }
+});
+
+// Get API key details
+app.get('/api/keys/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    const keyDetails = apiKeyManager.getKeyDetails(key);
+    
+    if (!keyDetails) {
+      return res.status(404).json({ error: 'API key not found' });
+    }
+    
+    res.json(keyDetails);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch API key details' });
+  }
+});
+
+// Revoke API key
+app.post('/api/keys/:key/revoke', async (req, res) => {
+  try {
+    const { key } = req.params;
+    const success = apiKeyManager.revokeKey(key);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'API key not found' });
+    }
+    
+    res.json({ success: true, message: 'API key revoked' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to revoke API key' });
+  }
+});
+
+// Delete API key
+app.delete('/api/keys/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    const success = apiKeyManager.deleteKey(key);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'API key not found' });
+    }
+    
+    res.json({ success: true, message: 'API key deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete API key' });
+  }
+});
+
+// Update API key limits
+app.patch('/api/keys/:key/limits', async (req, res) => {
+  try {
+    const { key } = req.params;
+    const { limits } = req.body;
+    
+    const success = apiKeyManager.updateLimits(key, limits);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'API key not found' });
+    }
+    
+    res.json({ success: true, message: 'Limits updated' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update limits' });
+  }
+});
+
+// Get usage statistics
+app.get('/api/keys/stats/usage', async (req, res) => {
+  try {
+    const stats = apiKeyManager.getUsageStats();
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch usage stats' });
+  }
+});
+
+// User Management Endpoints
+
+// Login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+
+    const result = userManager.login(email, password);
+    
+    if (!result.success) {
+      return res.status(401).json({ error: result.error });
+    }
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Logout
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (token) {
+      userManager.logout(token);
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+// Get current user
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const validation = userManager.validateSession(token);
+    
+    if (!validation.valid) {
+      return res.status(401).json({ error: validation.error });
+    }
+
+    res.json({ user: validation.user });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get user' });
+  }
+});
+
+// Create user
+app.post('/api/users', async (req, res) => {
+  try {
+    const { email, password, name, role, company, department } = req.body;
+    
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Email, password, and name required' });
+    }
+
+    // Check if user exists
+    if (userManager.getUserByEmail(email)) {
+      return res.status(400).json({ error: 'User already exists' });
+    }
+
+    const user = userManager.createUser({
+      email,
+      password,
+      name,
+      role: role || 'user',
+      company,
+      department
+    });
+
+    res.json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+// Get all users
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = userManager.getAllUsers();
+    res.json({ users });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Get user by ID
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const user = userManager.getUserById(req.params.id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ user });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
+// Update user
+app.patch('/api/users/:id', async (req, res) => {
+  try {
+    const user = userManager.updateUser(req.params.id, req.body);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// Delete user
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    const success = userManager.deleteUser(req.params.id);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// Suspend user
+app.post('/api/users/:id/suspend', async (req, res) => {
+  try {
+    const success = userManager.suspendUser(req.params.id);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to suspend user' });
+  }
+});
+
+// Activate user
+app.post('/api/users/:id/activate', async (req, res) => {
+  try {
+    const success = userManager.activateUser(req.params.id);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to activate user' });
+  }
+});
+
+// Change password
+app.post('/api/users/:id/password', async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ error: 'Old and new password required' });
+    }
+
+    const result = userManager.changePassword(req.params.id, oldPassword, newPassword);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+// Get user statistics
+app.get('/api/users/stats/overview', async (req, res) => {
+  try {
+    const stats = userManager.getUserStats();
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch user stats' });
+  }
+});
+
+// Get active sessions
+app.get('/api/users/sessions/active', async (req, res) => {
+  try {
+    const sessions = userManager.getActiveSessions();
+    res.json({ sessions });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch sessions' });
   }
 });
 
