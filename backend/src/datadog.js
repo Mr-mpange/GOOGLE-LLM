@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { config } from './config.js';
 
-const DATADOG_API_KEY = process.env.DATADOG_API_KEY;
-const DATADOG_SITE = process.env.DATADOG_SITE || 'datadoghq.com';
+const DATADOG_API_KEY = config.datadog.apiKey;
+const DATADOG_SITE = config.datadog.site;
 const SERVICE_NAME = 'llm-guardian';
 
 /**
@@ -9,8 +10,7 @@ const SERVICE_NAME = 'llm-guardian';
  */
 export async function sendLog(message, attributes = {}, tags = []) {
   if (!DATADOG_API_KEY) {
-    console.warn('Datadog API key not configured, skipping log');
-    return;
+    return; // Silently skip if not configured
   }
 
   try {
@@ -30,11 +30,12 @@ export async function sendLog(message, attributes = {}, tags = []) {
         headers: {
           'Content-Type': 'application/json',
           'DD-API-KEY': DATADOG_API_KEY
-        }
+        },
+        timeout: 5000
       }
     );
   } catch (error) {
-    console.error('Failed to send log to Datadog:', error.message);
+    // Silently fail - don't spam console with Datadog errors
   }
 }
 
@@ -43,8 +44,7 @@ export async function sendLog(message, attributes = {}, tags = []) {
  */
 export async function sendMetric(metricName, value, tags = []) {
   if (!DATADOG_API_KEY) {
-    console.warn('Datadog API key not configured, skipping metric');
-    return;
+    return; // Silently skip if not configured
   }
 
   try {
@@ -68,11 +68,12 @@ export async function sendMetric(metricName, value, tags = []) {
         headers: {
           'Content-Type': 'application/json',
           'DD-API-KEY': DATADOG_API_KEY
-        }
+        },
+        timeout: 5000
       }
     );
   } catch (error) {
-    console.error('Failed to send metric to Datadog:', error.message);
+    // Silently fail - don't spam console with Datadog errors
   }
 }
 
@@ -81,8 +82,7 @@ export async function sendMetric(metricName, value, tags = []) {
  */
 export async function sendSecuritySignal(signal) {
   if (!DATADOG_API_KEY) {
-    console.warn('Datadog API key not configured, skipping security signal');
-    return;
+    return; // Silently skip if not configured
   }
 
   try {
@@ -100,7 +100,7 @@ export async function sendSecuritySignal(signal) {
       ...(signal.tags || [])
     ]);
   } catch (error) {
-    console.error('Failed to send security signal:', error.message);
+    // Silently fail
   }
 }
 
@@ -117,7 +117,7 @@ export async function sendTrace(spanData) {
     // This is a simplified version for demonstration
     await sendLog('apm.trace', spanData, ['trace:true']);
   } catch (error) {
-    console.error('Failed to send trace:', error.message);
+    // Silently fail
   }
 }
 

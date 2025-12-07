@@ -1,0 +1,152 @@
+================================================================================
+                    📥 INSTALL GCLOUD CLI - STEP BY STEP
+================================================================================
+
+YOU NEED TO INSTALL GCLOUD CLI FIRST!
+
+The error "gcloud is not recognized" means it's not installed yet.
+
+
+INSTALLATION STEPS (5 MINUTES):
+================================================================================
+
+Step 1: Download the Installer
+-------------------------------
+
+Go to this URL in your browser:
+  https://cloud.google.com/sdk/docs/install
+
+Or use this direct link for Windows:
+  https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe
+
+
+Step 2: Run the Installer
+--------------------------
+
+1. Double-click the downloaded file
+2. Click "Yes" if Windows asks for permission
+3. Follow the installation wizard:
+   - Click "Next"
+   - Accept the terms
+   - Choose installation location (default is fine)
+   - Click "Install"
+
+
+Step 3: Complete Setup
+-----------------------
+
+After installation finishes:
+
+1. Check "Start Cloud SDK Shell" (if shown)
+2. Check "Run 'gcloud init'" (if shown)
+3. Click "Finish"
+
+A command prompt window will open automatically.
+
+
+Step 4: Initialize gcloud
+--------------------------
+
+In the command prompt that opened:
+
+1. Type: Y (to log in)
+2. A browser will open
+3. Sign in with your Google account
+4. Click "Allow"
+5. Select or create a project (choose: rosy-stronghold-475804-s7)
+
+
+Step 5: Verify Installation
+----------------------------
+
+Open a NEW Command Prompt and type:
+  gcloud --version
+
+You should see version information!
+
+
+AFTER INSTALLATION:
+================================================================================
+
+1. Close all Command Prompt windows
+2. Open a NEW Command Prompt
+3. Run: FIX_AUTH_NOW.bat
+4. Or manually run:
+   gcloud auth application-default login
+   gcloud services enable aiplatform.googleapis.com --project=rosy-stronghold-475804-s7
+
+
+QUICK LINKS:
+================================================================================
+
+Main Download Page:
+  https://cloud.google.com/sdk/docs/install
+
+Windows Installer (Direct):
+  https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe
+
+Installation Guide:
+  https://cloud.google.com/sdk/docs/install-sdk
+
+
+TROUBLESHOOTING:
+================================================================================
+
+Problem: "gcloud still not recognized after install"
+Solution: Close ALL command prompts and open a NEW one
+
+Problem: "Installation failed"
+Solution: Run installer as Administrator (right-click → Run as administrator)
+
+Problem: "Can't download installer"
+Solution: Check your internet connection or firewall
+
+
+WHAT GCLOUD CLI DOES:
+================================================================================
+
+gcloud CLI is Google's command-line tool that lets your computer:
+  ✓ Authenticate with Google Cloud
+  ✓ Use Vertex AI (for the LLM)
+  ✓ Manage Google Cloud resources
+
+It's required for LLM Guardian to work!
+
+
+AFTER YOU INSTALL:
+================================================================================
+
+1. Verify: gcloud --version
+2. Authenticate: gcloud auth application-default login
+3. Enable API: gcloud services enable aiplatform.googleapis.com --project=rosy-stronghold-475804-s7
+4. Run: START_ALL.bat
+5. Test the app!
+
+
+NEED HELP?
+================================================================================
+
+If you have issues:
+  1. Make sure you downloaded from the official Google Cloud site
+  2. Try running installer as Administrator
+  3. Restart your computer after installation
+  4. Check Windows PATH includes gcloud
+
+
+================================================================================
+
+SUMMARY:
+  1. Download: https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe
+  2. Install (takes 5 minutes)
+  3. Run: FIX_AUTH_NOW.bat
+  4. Done!
+
+================================================================================
+
+
+ 
+curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+   \
+  -d ''

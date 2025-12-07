@@ -30,3 +30,48 @@ body {
     @apply w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-datadog-purple focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100;
   }
 }
+
+/* Formatted AI Response Styles */
+.formatted-response {
+  line-height: 1.7;
+}
+
+.formatted-response .response-heading {
+  @apply text-lg font-bold text-gray-900 dark:text-white mt-4 mb-2 first:mt-0;
+}
+
+.formatted-response .response-paragraph {
+  @apply text-gray-700 dark:text-gray-300 mb-3;
+}
+
+.formatted-response .response-list {
+  @apply list-disc list-inside space-y-1 mb-3 text-gray-700 dark:text-gray-300;
+}
+
+.formatted-response .response-list li {
+  @apply ml-4;
+}
+
+.formatted-response .response-code {
+  @apply bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-4 mb-3 overflow-x-auto;
+}
+
+.formatted-response .response-code code {
+  @apply text-sm font-mono text-gray-800 dark:text-gray-200;
+}
+
+.formatted-response strong {
+  @apply font-bold text-gray-900 dark:text-white;
+}
+
+.formatted-response em {
+  @apply italic text-gray-700 dark:text-gray-300;
+}
+
+.formatted-response a {
+  @apply text-datadog-purple hover:underline;
+}
+
+.formatted-response .inline-code {
+  @apply bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono text-purple-600 dark:text-purple-400;
+}

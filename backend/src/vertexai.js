@@ -1,18 +1,21 @@
 import { VertexAI } from '@google-cloud/vertexai';
+import { config } from './config.js';
 
-const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+const projectId = config.googleCloud.project;
+const location = config.googleCloud.location;
+
+console.log(`✓ Initializing Vertex AI with project: ${projectId}, location: ${location}`);
 
 // Initialize Vertex AI
 const vertexAI = new VertexAI({ project: projectId, location: location });
-const model = 'gemini-pro';
+const model = 'gemini-2.0-flash-exp';
 
 /**
  * Generate content using Vertex AI Gemini
  */
 export async function generateContent(prompt) {
   try {
-    const generativeModel = vertexAI.preview.getGenerativeModel({
+    const generativeModel = vertexAI.getGenerativeModel({
       model: model,
       generation_config: {
         max_output_tokens: 2048,

@@ -1,0 +1,141 @@
+================================================================================
+                    📋 LLM GUARDIAN - SETUP SUMMARY
+================================================================================
+
+COMPLETE SETUP CHECKLIST:
+================================================================================
+
+□ Step 1: Install Node.js
+  Download: https://nodejs.org
+  Verify: node --version
+
+□ Step 2: Install gcloud CLI
+  Download: https://cloud.google.com/sdk/docs/install
+  Guide: INSTALL_GCLOUD.txt
+  Verify: gcloud --version
+
+□ Step 3: Authenticate with Google Cloud
+  Easy: Run FIX_AUTH_NOW.bat (Windows)
+  Manual:
+    gcloud auth application-default login
+    gcloud services enable aiplatform.googleapis.com --project=rosy-stronghold-475804-s7
+  Verify: gcloud auth application-default print-access-token
+
+□ Step 4: Enable Billing
+  Visit: https://console.developers.google.com/billing/enable?project=rosy-stronghold-475804-s7
+  Guide: ENABLE_BILLING.txt
+  ⚠️ IMPORTANT: Wait 2-5 minutes after enabling!
+
+□ Step 5: Configure Datadog (Optional for testing)
+  Get API key: https://app.datadoghq.com
+  Update: backend/.env
+
+□ Step 6: Run the Application
+  Windows: START_ALL.bat
+  Or: cd backend && npm start (+ cd frontend && npm run dev)
+
+□ Step 7: Test
+  Open: http://localhost:3000
+  Try prompt: "Explain quantum computing"
+
+
+QUICK REFERENCE:
+================================================================================
+
+Essential Files:
+  README.md              - Complete documentation
+  HOW_TO_RUN.txt         - Quick start guide
+  INSTALL_GCLOUD.txt     - gcloud installation
+  ENABLE_BILLING.txt     - Billing setup
+
+Helper Scripts (Windows):
+  START_ALL.bat          - Start everything (backend + frontend)
+  STOP_ALL.bat           - Stop all servers
+  FIX_AUTH_NOW.bat       - Authenticate with Google Cloud
+
+URLs:
+  Frontend:    http://localhost:3000
+  Backend:     http://localhost:8081
+  Health:      http://localhost:8081/health
+
+
+COMMON ISSUES:
+================================================================================
+
+Issue: "gcloud is not recognized"
+Fix: Install gcloud CLI (INSTALL_GCLOUD.txt)
+
+Issue: "Unable to authenticate"
+Fix: Run FIX_AUTH_NOW.bat or gcloud auth application-default login
+
+Issue: "Billing not enabled" (403)
+Fix: Enable billing (ENABLE_BILLING.txt), wait 2-5 minutes
+
+Issue: "Port already in use"
+Fix: Run STOP_ALL.bat
+
+
+COST INFORMATION:
+================================================================================
+
+Free Tier:
+  ✓ $300 credit for new users (90 days)
+  ✓ Vertex AI: 60 requests/minute free
+  ✓ Testing cost: < $1
+
+After Free Tier:
+  ✓ ~$0.00025 per 1K input tokens
+  ✓ ~$0.0005 per 1K output tokens
+  ✓ Example: 100 prompts ≈ $0.10
+
+
+DOCUMENTATION:
+================================================================================
+
+Main Docs:
+  README.md              - Complete guide
+  HOW_TO_RUN.txt         - Quick start
+  INSTALL_GCLOUD.txt     - gcloud setup
+  ENABLE_BILLING.txt     - Billing setup
+
+Technical Docs:
+  docs/ARCHITECTURE.md   - System architecture
+  docs/DEPLOYMENT.md     - Production deployment
+  docs/API_REFERENCE.md  - API documentation
+
+Hackathon:
+  docs/DEMO_SCRIPT.md    - Demo video script
+  docs/DEVPOST_SUBMISSION.md - Submission
+
+
+PROJECT STRUCTURE:
+================================================================================
+
+llm-guardian/
+├── backend/           - Node.js API
+├── frontend/          - React UI
+├── dashboards/        - Datadog dashboards (3)
+├── detection-rules/   - Detection rules (5)
+├── docs/              - Documentation
+├── scripts/           - Deployment scripts
+└── *.bat              - Helper scripts (Windows)
+
+
+SUPPORT:
+================================================================================
+
+Documentation: See README.md and docs/ folder
+Issues: Check troubleshooting sections
+GitHub: https://github.com/yourusername/llm-guardian
+
+
+================================================================================
+
+READY TO START?
+
+1. Complete the checklist above
+2. Run START_ALL.bat (or manual commands)
+3. Open http://localhost:3000
+4. Test with a prompt!
+
+================================================================================

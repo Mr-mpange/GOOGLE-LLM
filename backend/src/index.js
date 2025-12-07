@@ -1,15 +1,18 @@
+// Load configuration first (this loads .env)
+import { config } from './config.js';
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import { generateContent, calculateCost } from './vertexai.js';
 import { sendLog, sendMetric, sendSecuritySignal } from './datadog.js';
 import { detectPromptInjection, calculateSafetyScore } from './security.js';
-
-dotenv.config();
+import { formatResponse, toHTML, toMarkdown } from './responseFormatter.js';
+import metricsStore from './metricsStore.js';
+import alertsStore, { getTimeAgo } from './alertsStore.js';
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = config.port;
 
 // Middleware
 app.use(cors());
@@ -43,6 +46,18 @@ app.post('/api/prompt', async (req, res) => {
     const injectionDetected = detectPromptInjection(prompt);
     if (injectionDetected.isInjection) {
       const latency = Date.now() - startTime;
+      
+      // Add security alert
+      alertsStore.addAlert({
+        severity: 'high',
+        title: 'Prompt Injection Blocked',
+        message: 'Suspicious prompt pattern detected and blocked',
+        metadata: {
+          patterns: injectionDetected.patterns,
+          userId,
+          requestId
+        }
+      });
       
       // Log security event
       await sendSecuritySignal({
@@ -126,6 +141,13 @@ app.post('/api/prompt', async (req, res) => {
 
     // Check for high latency
     if (latency > 5000) {
+      alertsStore.addAlert({
+        severity: 'high',
+        title: 'High Latency Detected',
+        message: `Response time exceeded 5s threshold (${latency}ms)`,
+        metadata: { latency, threshold: 5000, requestId }
+      });
+      
       await sendLog('llm.alert.high_latency', {
         message: 'High latency detected',
         latency,
@@ -134,10 +156,40 @@ app.post('/api/prompt', async (req, res) => {
       }, ['alert:high-latency']);
     }
 
+    // Check for low safety score
+    if (safetyScore < 0.7) {
+      alertsStore.addAlert({
+        severity: 'medium',
+        title: 'Low Safety Score',
+        message: `Response safety score below threshold (${(safetyScore * 100).toFixed(0)}%)`,
+        metadata: { safetyScore, requestId }
+      });
+    }
+
+    // Record metrics
+    metricsStore.recordRequest({
+      status: 'success',
+      latency,
+      tokensIn,
+      tokensOut,
+      cost,
+      safetyScore
+    });
+
+    // Format response with structure
+    const structuredResponse = formatResponse(aiResponse.text);
+    const htmlResponse = toHTML(structuredResponse);
+    const markdownResponse = toMarkdown(structuredResponse);
+
     // Return response
     res.json({
       requestId,
       text: aiResponse.text,
+      formatted: {
+        html: htmlResponse,
+        markdown: markdownResponse,
+        structured: structuredResponse
+      },
       metadata: {
         tokensIn,
         tokensOut,
@@ -145,14 +197,28 @@ app.post('/api/prompt', async (req, res) => {
         latency,
         cost,
         safetyScore,
-        model: 'gemini-pro'
+        model: 'gemini-2.0-flash-exp'
       }
     });
 
   } catch (error) {
     const latency = Date.now() - startTime;
     
-    console.error('Error processing prompt:', error);
+    console.error('\n❌ ERROR processing prompt:');
+    console.error('Message:', error.message);
+    console.error('Type:', error.name);
+    console.error('Stack:', error.stack);
+    console.error('');
+
+    // Record error in metrics
+    metricsStore.recordRequest({
+      status: 'error',
+      latency,
+      tokensIn: 0,
+      tokensOut: 0,
+      cost: 0,
+      safetyScore: 0
+    });
 
     // Log error to Datadog
     await sendLog('llm.error', {
@@ -171,7 +237,8 @@ app.post('/api/prompt', async (req, res) => {
     res.status(500).json({
       error: 'Failed to process prompt',
       requestId,
-      message: error.message
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -179,18 +246,52 @@ app.post('/api/prompt', async (req, res) => {
 // Get recent metrics endpoint
 app.get('/api/metrics', async (req, res) => {
   try {
-    // This would query Datadog API for recent metrics
-    // For demo purposes, returning mock data
-    res.json({
-      totalRequests: 1247,
-      avgLatency: 1834,
-      totalTokens: 458392,
-      totalCost: 12.47,
-      errorRate: 0.02,
-      avgSafetyScore: 0.94
-    });
+    const metrics = metricsStore.getMetrics();
+    res.json(metrics);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch metrics' });
+  }
+});
+
+// Get alerts endpoint
+app.get('/api/alerts', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const alerts = alertsStore.getAlerts(limit).map(alert => ({
+      ...alert,
+      timeAgo: getTimeAgo(alert.timestamp)
+    }));
+    
+    const stats = alertsStore.getAlertStats();
+    
+    res.json({
+      alerts,
+      stats
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch alerts' });
+  }
+});
+
+// Update alert status endpoint
+app.patch('/api/alerts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!['active', 'investigating', 'resolved'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    
+    const alert = alertsStore.updateAlertStatus(parseInt(id), status);
+    
+    if (!alert) {
+      return res.status(404).json({ error: 'Alert not found' });
+    }
+    
+    res.json(alert);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update alert' });
   }
 });
 
@@ -200,11 +301,43 @@ function estimateTokens(text) {
   return Math.ceil(text.length / 4);
 }
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🛡️  LLM Guardian API running on port ${PORT}`);
-  console.log(`📊 Datadog integration: ${process.env.DATADOG_API_KEY ? 'enabled' : 'disabled'}`);
-  console.log(`🤖 Vertex AI project: ${process.env.GOOGLE_CLOUD_PROJECT}`);
+// Start server with error handling
+const server = app.listen(PORT, () => {
+  console.log('\n========================================');
+  console.log('🛡️  LLM Guardian API');
+  console.log('========================================');
+  console.log(`✓ Server running on: http://localhost:${PORT}`);
+  console.log(`✓ Health check: http://localhost:${PORT}/health`);
+  console.log(`✓ Datadog integration: ${config.datadog.apiKey ? 'enabled' : 'disabled'}`);
+  console.log(`✓ Vertex AI project: ${config.googleCloud.project}`);
+  console.log('========================================\n');
+  console.log('Press Ctrl+C to stop the server\n');
+});
+
+// Handle port already in use error
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error('\n❌ ERROR: Port 8080 is already in use!\n');
+    console.error('Solutions:');
+    console.error('  1. Run STOP_ALL.bat to stop all servers');
+    console.error('  2. Or change PORT in backend/.env to a different port (e.g., 8081)');
+    console.error('  3. Or manually kill the process using port 8080:\n');
+    console.error('     netstat -ano | findstr :8080');
+    console.error('     taskkill /F /PID <PID>\n');
+    process.exit(1);
+  } else {
+    console.error('Server error:', error);
+    process.exit(1);
+  }
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n\nShutting down gracefully...');
+  server.close(() => {
+    console.log('✓ Server closed');
+    process.exit(0);
+  });
 });
 
 export default app;

@@ -73,21 +73,7 @@ export default function PromptTester({ onMetricsUpdate }) {
           />
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2">
-            {examplePrompts.map((example, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setPrompt(example)}
-                className="text-xs px-3 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full text-gray-700 dark:text-gray-300 transition-colors"
-                disabled={loading}
-              >
-                Example {idx + 1}
-              </button>
-            ))}
-          </div>
-
+        <div className="flex items-center justify-end">
           <button
             type="submit"
             disabled={loading || !prompt.trim()}
@@ -123,15 +109,16 @@ export default function PromptTester({ onMetricsUpdate }) {
       {response && (
         <div className="mt-6 space-y-4">
           <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-            <div className="flex items-center space-x-2 mb-2">
+            <div className="flex items-center space-x-2 mb-3">
               <CheckCircle className="w-5 h-5 text-green-500" />
               <p className="text-sm font-medium text-green-800 dark:text-green-200">
                 Response Generated
               </p>
             </div>
-            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-              {response.text}
-            </p>
+            <div 
+              className="formatted-response text-sm text-gray-700 dark:text-gray-300"
+              dangerouslySetInnerHTML={{ __html: response.formatted?.html || response.text }}
+            />
           </div>
 
           {/* Metadata */}
