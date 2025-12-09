@@ -2,7 +2,19 @@
 
 **AI Observability Platform with Intelligent Self-Healing**
 
-LLM Guardian is a production-ready monitoring and security platform for Large Language Models that automatically detects and fixes issues in real-time. Built with Google Vertex AI (Gemini) and Datadog integration.
+LLM Guardian is a monitoring and security platform for Large Language Models that automatically detects and fixes issues in real-time. Built with Google Vertex AI (Gemini).
+
+---
+
+## ✨ Key Features
+
+- 🤖 **AI Self-Healing** - Automatically switches models when detecting latency or cost issues
+- 🔐 **Security Monitoring** - Real-time prompt injection detection and user risk scoring
+- 📊 **Live Metrics** - Real-time charts for latency, tokens, and costs
+- 💰 **Cost Optimization** - Track and optimize LLM API costs automatically
+- 🔑 **API Key Management** - Create, manage, and revoke API keys with rate limiting
+- ⚡ **Multi-Model Support** - Switch between Gemini 2.0 Flash, 1.5 Flash, and 1.5 Pro
+- 🚨 **Smart Alerts** - Automatic alerts for security threats and performance issues
 
 ---
 
@@ -162,13 +174,13 @@ Request → Cost Calculation → Projection → Auto-Optimization
 │                  Backend API (Node.js)                    │
 │  - Request Handler  - Security Scanner  - Self-Healing   │
 │  - Port 8081                                              │
-└──────┬──────────────────┬────────────────────┬───────────┘
-       │                  │                    │
-       ▼                  ▼                    ▼
-┌─────────────┐   ┌──────────────┐   ┌────────────────┐
-│ Vertex AI   │   │   Datadog    │   │  In-Memory     │
-│  (Gemini)   │   │  (Optional)  │   │  Metrics Store │
-└─────────────┘   └──────────────┘   └────────────────┘
+└──────┬──────────────────────────────────────┬───────────┘
+       │                                      │
+       ▼                                      ▼
+┌─────────────┐                      ┌────────────────┐
+│ Vertex AI   │                      │  In-Memory     │
+│  (Gemini)   │                      │  Metrics Store │
+└─────────────┘                      └────────────────┘
 ```
 
 ### Components
@@ -179,17 +191,18 @@ Request → Cost Calculation → Projection → Auto-Optimization
 - Cost optimization dashboard
 - User risk scoring panel
 - Alert notifications
+- API key management
 
 **Backend:**
 - Express.js REST API
 - Prompt injection detection
-- Self-healing engine
+- Self-healing engine (auto model switching)
 - Metrics aggregation
 - User risk management
+- API key authentication
 
 **Integrations:**
 - Google Vertex AI (Gemini 2.0 Flash, 1.5 Flash, 1.5 Pro)
-- Datadog (optional monitoring)
 - Google Cloud authentication
 
 ---
@@ -224,10 +237,6 @@ PORT=8081
 GOOGLE_CLOUD_PROJECT=your-project-id
 GOOGLE_CLOUD_LOCATION=us-central1
 NODE_ENV=development
-
-# Optional Datadog
-DATADOG_API_KEY=your-key
-DATADOG_SITE=datadoghq.com
 ```
 
 ### 3. Authenticate with Google Cloud
@@ -720,8 +729,7 @@ gsutil -m cp -r dist/* gs://your-bucket/
 
 **Optional:**
 - `PORT` - Backend port (default: 8081)
-- `DATADOG_API_KEY` - Datadog integration
-- `DATADOG_SITE` - Datadog site (datadoghq.com)
+- `NODE_ENV` - Environment (development/production)
 
 ---
 
@@ -731,47 +739,44 @@ gsutil -m cp -r dist/* gs://your-bucket/
 llm-guardian/
 ├── backend/
 │   ├── src/
-│   │   ├── index.js           # Express server
-│   │   ├── vertexai.js        # Gemini AI integration
-│   │   ├── security.js        # Prompt injection detection
-│   │   ├── self-healing.js    # Auto-recovery logic
-│   │   └── metrics.js         # Metrics tracking
-│   ├── .env                   # Configuration
+│   │   ├── index.js              # Express server
+│   │   ├── vertexai.js           # Gemini AI integration
+│   │   ├── security.js           # Prompt injection detection
+│   │   ├── selfHealing.js        # Auto-recovery logic
+│   │   ├── metricsStore.js       # Metrics tracking
+│   │   ├── alertsStore.js        # Alert management
+│   │   ├── apiKeyManager.js      # API key authentication
+│   │   └── responseFormatter.js  # Response formatting
+│   ├── .env                      # Configuration
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx            # Main app component
+│   │   ├── App.jsx               # Main app component
 │   │   ├── components/
-│   │   │   ├── PromptTester.jsx      # Chat interface
-│   │   │   ├── ChartsPanel.jsx       # Live charts
-│   │   │   ├── MetricsPanel.jsx      # Metrics display
-│   │   │   ├── SelfHealingPanel.jsx  # Healing status
-│   │   │   ├── CostOptimizationPanel.jsx
-│   │   │   └── UserRiskPanel.jsx
+│   │   │   ├── PromptTester.jsx           # Chat interface
+│   │   │   ├── ChartsPanel.jsx            # Live charts
+│   │   │   ├── MetricsPanel.jsx           # Metrics display
+│   │   │   ├── SelfHealingPanel.jsx       # Healing status
+│   │   │   ├── CostOptimizationPanel.jsx  # Cost tracking
+│   │   │   ├── UserRiskPanel.jsx          # User risk scores
+│   │   │   ├── AlertsPanel.jsx            # Alert notifications
+│   │   │   └── APIKeyManagement.jsx       # API key management
 │   │   └── index.css
 │   └── package.json
-├── detection-rules/           # Datadog alert rules
-├── dashboards/                # Datadog dashboards
-├── docs/                      # Documentation
-├── START_ALL.bat             # Windows start script
+├── START_ALL.bat                 # Windows start script
+├── STOP_ALL.bat                  # Windows stop script
 └── README.md
 ```
 
 ---
 
-## 🎓 Learn More
+## 🎓 Key Technologies
 
-**Documentation:**
-- `DATADOG_SETUP.md` - Datadog integration guide
-- `docs/ARCHITECTURE.md` - Detailed architecture
-- `docs/API_REFERENCE.md` - Complete API docs
-- `docs/DEPLOYMENT.md` - Production deployment guide
-
-**Key Technologies:**
 - [Google Vertex AI](https://cloud.google.com/vertex-ai) - Gemini models
-- [Datadog](https://www.datadoghq.com/) - Observability platform
 - [React](https://react.dev/) - Frontend framework
 - [Express.js](https://expressjs.com/) - Backend framework
+- [Recharts](https://recharts.org/) - Data visualization
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
 
 ---
 
@@ -794,15 +799,10 @@ MIT License - See LICENSE file for details
 
 ## 🙏 Acknowledgments
 
-Built for **Google Cloud × Datadog Hackathon**
-
 - Google Cloud Platform - Vertex AI & Gemini models
-- Datadog - Observability and monitoring
 - React & Tailwind CSS - UI framework
 - Open source community
 
 ---
 
 **Making AI systems reliable, secure, and cost-effective through intelligent automation.**
-
-For questions or support, open an issue on GitHub.
