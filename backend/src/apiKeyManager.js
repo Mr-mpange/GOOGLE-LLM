@@ -1,234 +1,164 @@
 /**
  * API Key Management System
- * Allows admins to create, manage, and revoke API keys for external users
+ * Generates and validates API keys for LLM Guardian
  */
 
 import crypto from 'crypto';
 
 class APIKeyManager {
   constructor() {
+    // In-memory store (in production, use database)
     this.apiKeys = new Map();
-    this.usage = new Map();
+    this.keyUsage = new Map();
     
-    // Create a default admin key
-    this.createKey('admin', 'Admin User', { admin: true, unlimited: true });
+    // Generate a default key for demo
+    this.generateKey('demo-user', 'Demo User');
   }
 
   /**
    * Generate a new API key
    */
-  generateKey() {
-    return 'llmg_' + crypto.randomBytes(32).toString('hex');
-  }
-
-  /**
-   * Create a new API key
-   */
-  createKey(userId, name, options = {}) {
-    const key = this.generateKey();
+  generateKey(userId, userName = 'Unknown') {
+    // Generate random key
+    const randomBytes = crypto.randomBytes(32);
+    const apiKey = 'llmg_' + randomBytes.toString('hex');
+    
     const keyData = {
-      key,
+      key: apiKey,
       userId,
-      name,
+      userName,
       createdAt: new Date().toISOString(),
       lastUsed: null,
-      status: 'active',
-      permissions: {
-        admin: options.admin || false,
-        canPrompt: options.canPrompt !== false,
-        canViewMetrics: options.canViewMetrics !== false,
-        canManageKeys: options.canManageKeys || false
-      },
-      limits: {
-        requestsPerDay: options.requestsPerDay || 1000,
-        requestsPerMonth: options.requestsPerMonth || 30000,
-        maxTokensPerRequest: options.maxTokensPerRequest || 5000,
-        unlimited: options.unlimited || false
-      },
-      metadata: options.metadata || {}
+      requestCount: 0,
+      active: true,
+      rateLimit: 1000, // requests per hour
+      permissions: ['read', 'write']
     };
-
-    this.apiKeys.set(key, keyData);
-    this.usage.set(key, {
-      requestsToday: 0,
-      requestsThisMonth: 0,
-      totalRequests: 0,
-      totalTokens: 0,
-      totalCost: 0,
-      lastReset: new Date().toISOString()
-    });
-
+    
+    this.apiKeys.set(apiKey, keyData);
+    
+    console.log(`✓ Generated API key for ${userName}: ${apiKey.substring(0, 20)}...`);
+    
     return keyData;
   }
 
   /**
    * Validate API key
    */
-  validateKey(key) {
-    const keyData = this.apiKeys.get(key);
-    
-    if (!keyData) {
-      return { valid: false, error: 'Invalid API key' };
+  validateKey(apiKey) {
+    if (!apiKey || !apiKey.startsWith('llmg_')) {
+      return { valid: false, error: 'Invalid API key format' };
     }
 
-    if (keyData.status !== 'active') {
+    const keyData = this.apiKeys.get(apiKey);
+    
+    if (!keyData) {
+      return { valid: false, error: 'API key not found' };
+    }
+
+    if (!keyData.active) {
       return { valid: false, error: 'API key is inactive' };
     }
 
-    const usage = this.usage.get(key);
+    // Check rate limit
+    const usage = this.keyUsage.get(apiKey) || { count: 0, resetAt: Date.now() + 3600000 };
     
-    // Check rate limits
-    if (!keyData.limits.unlimited) {
-      if (usage.requestsToday >= keyData.limits.requestsPerDay) {
-        return { valid: false, error: 'Daily request limit exceeded' };
-      }
-      if (usage.requestsThisMonth >= keyData.limits.requestsPerMonth) {
-        return { valid: false, error: 'Monthly request limit exceeded' };
-      }
+    if (Date.now() > usage.resetAt) {
+      // Reset counter
+      usage.count = 0;
+      usage.resetAt = Date.now() + 3600000;
     }
 
-    return { valid: true, keyData, usage };
-  }
-
-  /**
-   * Record API key usage
-   */
-  recordUsage(key, tokens, cost) {
-    const usage = this.usage.get(key);
-    const keyData = this.apiKeys.get(key);
-    
-    if (usage && keyData) {
-      usage.requestsToday++;
-      usage.requestsThisMonth++;
-      usage.totalRequests++;
-      usage.totalTokens += tokens;
-      usage.totalCost += cost;
-      
-      keyData.lastUsed = new Date().toISOString();
+    if (usage.count >= keyData.rateLimit) {
+      return { valid: false, error: 'Rate limit exceeded' };
     }
-  }
 
-  /**
-   * Get all API keys (admin only)
-   */
-  getAllKeys() {
-    const keys = [];
-    for (const [key, data] of this.apiKeys.entries()) {
-      const usage = this.usage.get(key);
-      keys.push({
-        ...data,
-        key: this.maskKey(key),
-        fullKey: key,
-        usage
-      });
-    }
-    return keys;
-  }
+    // Update usage
+    usage.count++;
+    this.keyUsage.set(apiKey, usage);
+    
+    // Update last used
+    keyData.lastUsed = new Date().toISOString();
+    keyData.requestCount++;
 
-  /**
-   * Get API key details
-   */
-  getKeyDetails(key) {
-    const keyData = this.apiKeys.get(key);
-    const usage = this.usage.get(key);
-    
-    if (!keyData) return null;
-    
-    return {
-      ...keyData,
-      key: this.maskKey(key),
-      usage
+    return { 
+      valid: true, 
+      userId: keyData.userId,
+      userName: keyData.userName,
+      remaining: keyData.rateLimit - usage.count
     };
   }
 
   /**
    * Revoke API key
    */
-  revokeKey(key) {
-    const keyData = this.apiKeys.get(key);
+  revokeKey(apiKey) {
+    const keyData = this.apiKeys.get(apiKey);
     if (keyData) {
-      keyData.status = 'revoked';
-      keyData.revokedAt = new Date().toISOString();
+      keyData.active = false;
       return true;
     }
     return false;
   }
 
   /**
-   * Delete API key
+   * List all API keys for a user
    */
-  deleteKey(key) {
-    this.apiKeys.delete(key);
-    this.usage.delete(key);
-    return true;
-  }
-
-  /**
-   * Update API key limits
-   */
-  updateLimits(key, limits) {
-    const keyData = this.apiKeys.get(key);
-    if (keyData) {
-      keyData.limits = { ...keyData.limits, ...limits };
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Mask API key for display
-   */
-  maskKey(key) {
-    if (!key) return '';
-    return key.substring(0, 12) + '...' + key.substring(key.length - 4);
-  }
-
-  /**
-   * Reset daily usage counters
-   */
-  resetDailyUsage() {
-    for (const usage of this.usage.values()) {
-      usage.requestsToday = 0;
-    }
-  }
-
-  /**
-   * Reset monthly usage counters
-   */
-  resetMonthlyUsage() {
-    for (const usage of this.usage.values()) {
-      usage.requestsThisMonth = 0;
-    }
-  }
-
-  /**
-   * Get usage statistics
-   */
-  getUsageStats() {
-    let totalRequests = 0;
-    let totalTokens = 0;
-    let totalCost = 0;
-    let activeKeys = 0;
-
-    for (const [key, keyData] of this.apiKeys.entries()) {
-      if (keyData.status === 'active') {
-        activeKeys++;
-        const usage = this.usage.get(key);
-        if (usage) {
-          totalRequests += usage.totalRequests;
-          totalTokens += usage.totalTokens;
-          totalCost += usage.totalCost;
-        }
+  listKeys(userId) {
+    const keys = [];
+    for (const [key, data] of this.apiKeys.entries()) {
+      if (data.userId === userId) {
+        keys.push({
+          key: key.substring(0, 20) + '...',
+          fullKey: key,
+          createdAt: data.createdAt,
+          lastUsed: data.lastUsed,
+          requestCount: data.requestCount,
+          active: data.active
+        });
       }
     }
+    return keys;
+  }
+
+  /**
+   * Get key statistics
+   */
+  getKeyStats(apiKey) {
+    const keyData = this.apiKeys.get(apiKey);
+    if (!keyData) return null;
+
+    const usage = this.keyUsage.get(apiKey) || { count: 0, resetAt: Date.now() + 3600000 };
 
     return {
-      totalKeys: this.apiKeys.size,
-      activeKeys,
-      totalRequests,
-      totalTokens,
-      totalCost: parseFloat(totalCost.toFixed(4))
+      userId: keyData.userId,
+      userName: keyData.userName,
+      requestCount: keyData.requestCount,
+      hourlyUsage: usage.count,
+      rateLimit: keyData.rateLimit,
+      remaining: keyData.rateLimit - usage.count,
+      resetAt: new Date(usage.resetAt).toISOString(),
+      active: keyData.active
     };
+  }
+
+  /**
+   * Get all keys (admin only)
+   */
+  getAllKeys() {
+    const keys = [];
+    for (const [key, data] of this.apiKeys.entries()) {
+      keys.push({
+        key: key.substring(0, 20) + '...',
+        userId: data.userId,
+        userName: data.userName,
+        createdAt: data.createdAt,
+        lastUsed: data.lastUsed,
+        requestCount: data.requestCount,
+        active: data.active
+      });
+    }
+    return keys;
   }
 }
 

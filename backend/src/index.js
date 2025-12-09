@@ -12,6 +12,8 @@ import metricsStore from './metricsStore.js';
 import alertsStore, { getTimeAgo } from './alertsStore.js';
 import selfHealingSystem from './selfHealing.js';
 import apiKeyManager from './apiKeyManager.js';
+import { optionalApiKey } from './authMiddleware.js';
+import apiKeyManager from './apiKeyManager.js';
 import userManager from './userManager.js';
 import userRiskScoring from './userRiskScoring.js';
 
@@ -63,8 +65,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Main LLM endpoint
-app.post('/api/prompt', async (req, res) => {
+// Main LLM endpoint (with optional API key)
+app.post('/api/prompt', optionalApiKey, async (req, res) => {
   const { prompt, userId = 'anonymous', sessionId = uuidv4() } = req.body;
   const requestId = req.requestId;
   const startTime = Date.now();
@@ -767,6 +769,74 @@ app.get('/api/users/sessions/active', async (req, res) => {
     res.json({ sessions });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch sessions' });
+  }
+});
+
+// Generate API key
+app.post('/api/keys/generate', async (req, res) => {
+  try {
+    const { userId, userName } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    const keyData = apiKeyManager.generateKey(userId, userName || userId);
+    
+    res.json({
+      success: true,
+      apiKey: keyData.key,
+      userId: keyData.userId,
+      userName: keyData.userName,
+      createdAt: keyData.createdAt,
+      rateLimit: keyData.rateLimit
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to generate API key' });
+  }
+});
+
+// List API keys for user
+app.get('/api/keys/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const keys = apiKeyManager.listKeys(userId);
+    
+    res.json({ keys });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch API keys' });
+  }
+});
+
+// Get API key stats
+app.get('/api/keys/stats/:apiKey', async (req, res) => {
+  try {
+    const { apiKey } = req.params;
+    const stats = apiKeyManager.getKeyStats(apiKey);
+    
+    if (!stats) {
+      return res.status(404).json({ error: 'API key not found' });
+    }
+    
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch key stats' });
+  }
+});
+
+// Revoke API key
+app.delete('/api/keys/:apiKey', async (req, res) => {
+  try {
+    const { apiKey } = req.params;
+    const success = apiKeyManager.revokeKey(apiKey);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'API key not found' });
+    }
+    
+    res.json({ success: true, message: 'API key revoked' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to revoke API key' });
   }
 });
 
